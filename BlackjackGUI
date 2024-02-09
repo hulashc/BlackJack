@@ -1,0 +1,175 @@
+import tkinter as tk
+from tkinter import messagebox
+import random
+import sys
+
+# Set up the constants
+HEARTS = chr(9829)  # character 9823 is for "hearts" symbol
+DIAMONDS = chr(9830)  # character 9830 is for "diamonds" symbol
+SPADES = chr(9824)  # character 9824 is for "spades" symbol
+CLUBS = chr(9827)  # character 9827 is for "clubs" symbol
+
+BACKSIDE = 'backside'  # An arbitrary string to represent the back of a card
+
+
+class BlackjackGUI(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Blackjack")
+        self.geometry("600x400")
+
+        self.money = 5000
+        self.bet = tk.IntVar(value=0)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.money_label = tk.Label(self, text=f"Money: {self.money}")
+        self.money_label.pack()
+
+        self.bet_label = tk.Label(self, text="Place your bet:")
+        self.bet_label.pack()
+
+        self.bet_entry = tk.Entry(self, textvariable=self.bet)
+        self.bet_entry.pack()
+
+        self.place_bet_button = tk.Button(self, text="Place Bet", command=self.start_game)
+        self.place_bet_button.pack()
+
+    def start_game(self):
+        self.money -= self.bet.get()
+        self.money_label.config(text=f"Money: {self.money}")
+
+        self.game_frame = GameFrame(self, self.bet.get())
+        self.game_frame.pack()
+        self.place_bet_button.config(state="disabled")
+
+        self.bet_entry.config(state="disabled")
+
+        if self.money <= 0:
+            messagebox.showinfo("Game Over", "You're broke!")
+            self.quit()
+
+    def end_game(self, result):
+        if result == "win":
+            self.money += self.bet.get() * 2
+            messagebox.showinfo("Result", f"You won ${self.bet.get()}!")
+        elif result == "tie":
+            self.money += self.bet.get()
+            messagebox.showinfo("Result", "It's a tie!")
+        else:
+            messagebox.showinfo("Result", "You lost!")
+
+        self.money_label.config(text=f"Money: {self.money}")
+        self.game_frame.destroy()
+
+        self.place_bet_button.config(state="normal")
+        self.bet_entry.config(state="normal")
+
+
+class GameFrame(tk.Frame):
+    def __init__(self, master, bet):
+        super().__init__(master)
+        self.bet = bet
+        self.deck = self.get_deck()
+        self.dealer_hand = [self.deck.pop(), self.deck.pop()]
+        self.player_hand = [self.deck.pop(), self.deck.pop()]
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.dealer_label = tk.Label(self, text="Dealer's Hand:")
+        self.dealer_label.grid(row=0, column=0)
+
+        self.dealer_cards = tk.Label(self)
+        self.dealer_cards.grid(row=1, column=0)
+
+        self.player_label = tk.Label(self, text="Player's Hand:")
+        self.player_label.grid(row=2, column=0)
+
+        self.player_cards = tk.Label(self)
+        self.player_cards.grid(row=3, column=0)
+
+        self.hit_button = tk.Button(self, text="Hit", command=self.hit)
+        self.hit_button.grid(row=4, column=0)
+
+        self.stand_button = tk.Button(self, text="Stand", command=self.stand)
+        self.stand_button.grid(row=4, column=1)
+
+        self.display_hands()
+
+    def get_deck(self):
+        deck = []
+        for suit in (HEARTS, DIAMONDS, SPADES, CLUBS):
+            for rank in range(2, 11):
+                deck.append((str(rank), suit))
+            for rank in ('J', 'Q', 'K', 'A'):
+                deck.append((rank, suit))
+        random.shuffle(deck)
+        return deck
+
+    def display_hands(self):
+        self.dealer_cards.config(text=self.get_display_text(self.dealer_hand))
+        self.player_cards.config(text=self.get_display_text(self.player_hand))
+
+    def get_display_text(self, cards):
+        text = ""
+        for card in cards:
+            if card == BACKSIDE:
+                text += "|##| "
+            else:
+                rank, suit = card
+                text += f"|{rank} {suit}| "
+        return text
+
+    def hit(self):
+        new_card = self.deck.pop()
+        self.player_hand.append(new_card)
+        self.display_hands()
+
+        if self.get_hand_value(self.player_hand) > 21:
+            self.master.end_game("loss")
+
+    def stand(self):
+        while self.get_hand_value(self.dealer_hand) < 17:
+            self.dealer_hand.append(self.deck.pop())
+            self.display_hands()
+
+            if self.get_hand_value(self.dealer_hand) > 21:
+                self.master.end_game("win")
+                return
+
+        player_value = self.get_hand_value(self.player_hand)
+        dealer_value = self.get_hand_value(self.dealer_hand)
+
+        if dealer_value > player_value:
+            self.master.end_game("loss")
+        elif dealer_value == player_value:
+            self.master.end_game("tie")
+        else:
+            self.master.end_game("win")
+
+    def get_hand_value(self, cards):
+        value = 0
+        number_of_aces = 0
+
+        for card in cards:
+            rank = card[0]
+            if rank == 'A':
+                number_of_aces += 1
+            elif rank in ('K', 'Q', 'J'):
+                value += 10
+            else:
+                value += int(rank)
+
+        value += number_of_aces
+        for _ in range(number_of_aces):
+            if value + 10 <= 21:
+                value += 10
+
+        return value
+
+
+if __name__ == "__main__":
+    app = BlackjackGUI()
+    app.mainloop()
